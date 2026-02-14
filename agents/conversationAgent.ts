@@ -2,11 +2,13 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { MemoryStore } from './memoryStore';
 import { ElevenLabsClient } from "elevenlabs";
+import OpenAI, { toFile } from "openai";
 
 export class ConversationAgent {
   private llm: ChatOpenAI;
   private memoryStore: MemoryStore;
   private elevenLabs: ElevenLabsClient;
+  private openai: OpenAI;
 
   constructor(memoryStore: MemoryStore, elevenLabsApiKey: string, openAIApiKey: string) {
     this.llm = new ChatOpenAI({
@@ -17,6 +19,9 @@ export class ConversationAgent {
     this.memoryStore = memoryStore;
     this.elevenLabs = new ElevenLabsClient({
       apiKey: elevenLabsApiKey,
+    });
+    this.openai = new OpenAI({
+      apiKey: openAIApiKey,
     });
   }
 
@@ -36,7 +41,7 @@ export class ConversationAgent {
       const audioStream = await this.elevenLabs.generate({
         voice: "ztqW7U07ITK9TRp5iDUi",
         text: textResponse,
-        model_id: "eleven_multilingual_v2",
+        model_id: "eleven_flash_v2_5",
       });
 
       const chunks: Uint8Array[] = [];
@@ -55,6 +60,20 @@ export class ConversationAgent {
         text: textResponse,
         audioBase64: ""
       };
+    }
+  }
+
+  async transcribeAudio(audioBuffer: Buffer): Promise<string> {
+    try {
+      const file = await toFile(audioBuffer, "audio.wav");
+      const response = await this.openai.audio.transcriptions.create({
+        file: file,
+        model: "whisper-1",
+      });
+      return response.text;
+    } catch (error) {
+      console.error("OpenAI Whisper STT failed:", error);
+      throw error;
     }
   }
 

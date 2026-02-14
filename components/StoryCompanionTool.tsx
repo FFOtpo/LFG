@@ -203,7 +203,9 @@ const StoryCompanionTool = () => {
     const [comicPanels, setComicPanels] = useState<ComicPanel[]>([]);
     const [currentPanelIndex, setCurrentPanelIndex] = useState(0);
     const [sessionId, setSessionId] = useState<string | null>(null);
-    const [inputValue, setInputValue] = useState("");
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
     const handleStartChat = async () => {
         try {
@@ -219,7 +221,7 @@ const StoryCompanionTool = () => {
                 timestamp: new Date(),
             };
             setMessages([newMsg]);
-            setIsListening(true);
+            setIsListening(true); // Character speaks intro. In a real app we'd need audio for intro too.
 
         } catch (error) {
             console.error("Failed to start session:", error);
@@ -228,63 +230,104 @@ const StoryCompanionTool = () => {
         }
     };
 
-    const handleSendMessage = async () => {
-        if (!inputValue.trim() || !sessionId) return;
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
 
-        const userMsg: Message = {
-            id: Date.now().toString(),
-            text: inputValue,
-            isUser: true,
-            timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, userMsg]);
-        setInputValue("");
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' }); // or audio/webm
+                await handleSendAudio(audioBlob);
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            // Stop all tracks to release mic
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+    };
+
+    const handleSendAudio = async (audioBlob: Blob) => {
+        if (!sessionId) return;
         setIsProcessing(true);
 
         try {
-            const response = await axios.post('/api/chat', {
-                sessionId,
-                message: userMsg.text
-            });
+            // Convert Blob to Base64
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = async () => {
+                const base64Audio = (reader.result as string).split(',')[1];
 
-            const { response: botText, audioBase64, imageUrl } = response.data;
-
-            const botMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                text: botText,
-                isUser: false,
-                timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, botMsg]);
-
-            // Play audio
-            if (audioBase64 && !isMuted) {
-                try {
-                    const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
-                    audio.play();
-                    // Simulate speaking animation duration roughly
-                    setIsListening(true); // Character speaks
-                    audio.onended = () => {
-                        // setIsListening(false); // Character stops speaking (optional, or kept generic)
-                    };
-                } catch (e) {
-                    console.error("Audio playback error", e);
+                if (!base64Audio || base64Audio.length === 0) {
+                    console.error("Audio recording failed or was empty");
+                    setIsProcessing(false);
+                    return;
                 }
-            }
 
-            // Add to panels
-            if (imageUrl) {
-                const newPanel: ComicPanel = {
-                    id: (Date.now() + 2).toString(),
-                    imageUrl,
-                    caption: botText // Using bot response as caption for now, or could use extraction
-                };
-                setComicPanels(prev => [...prev, newPanel]);
-            }
+                try {
+                    const response = await axios.post('/api/chat', {
+                        sessionId,
+                        audioBase64: base64Audio
+                    });
 
+                    const { response: botText, audioBase64, imageUrl } = response.data;
+
+                    const botMsg: Message = {
+                        id: (Date.now() + 1).toString(),
+                        text: botText,
+                        isUser: false,
+                        timestamp: new Date(),
+                    };
+                    setMessages(prev => [...prev, botMsg]);
+
+                    // Play audio
+                    if (audioBase64 && !isMuted) {
+                        try {
+                            const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+                            audio.play();
+                            setIsListening(true);
+                            audio.onended = () => {
+                                setIsListening(false);
+                            };
+                        } catch (e) {
+                            console.error("Audio playback error", e);
+                        }
+                    }
+
+                    // Add to panels
+                    if (imageUrl) {
+                        const newPanel: ComicPanel = {
+                            id: (Date.now() + 2).toString(),
+                            imageUrl,
+                            caption: botText
+                        };
+                        setComicPanels(prev => [...prev, newPanel]);
+                    }
+                } catch (error) {
+                    console.error("Chat failed:", error);
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
         } catch (error) {
-            console.error("Chat failed:", error);
-        } finally {
+            console.error("Error processing audio:", error);
             setIsProcessing(false);
         }
     };
@@ -295,7 +338,6 @@ const StoryCompanionTool = () => {
     };
 
     const handleAddMore = () => {
-        // Return to chat
         setShowSketchbook(false);
     };
 
@@ -369,11 +411,11 @@ const StoryCompanionTool = () => {
 
                                     <div className="relative flex flex-col items-center gap-6">
                                         {/* Character */}
-                                        <CartoonCharacter isSpeaking={isProcessing} />
+                                        <CartoonCharacter isSpeaking={isListening} />
 
                                         {/* Controls */}
                                         <div className="flex flex-col items-center gap-4 w-full">
-                                            <div className="flex gap-3">
+                                            <div className="flex gap-3 justify-center items-center w-full">
                                                 {!sessionId ? (
                                                     <Button
                                                         size="lg"
@@ -385,61 +427,56 @@ const StoryCompanionTool = () => {
                                                         {isProcessing ? "Starting..." : "Start Chat"}
                                                     </Button>
                                                 ) : (
-                                                    <div className="flex w-full gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={inputValue}
-                                                            onChange={(e) => setInputValue(e.target.value)}
-                                                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                                            placeholder="Type your story idea..."
-                                                            className="flex-1 rounded-full border-2 border-amber-900/20 bg-white/50 px-4 py-2 focus:outline-none focus:border-primary"
-                                                            disabled={isProcessing}
-                                                        />
+                                                    <div className="flex flex-col items-center gap-2">
                                                         <Button
-                                                            onClick={handleSendMessage}
-                                                            disabled={!inputValue.trim() || isProcessing}
-                                                            size="icon"
-                                                            className="rounded-full h-12 w-12"
+                                                            onMouseDown={startRecording}
+                                                            onMouseUp={stopRecording}
+                                                            onTouchStart={startRecording}
+                                                            onTouchEnd={stopRecording}
+                                                            disabled={isProcessing}
+                                                            className={cn(
+                                                                "rounded-full h-24 w-24 shadow-xl transition-all duration-200",
+                                                                isRecording ? "bg-red-500 scale-110 animate-pulse" : "bg-primary hover:bg-primary/90"
+                                                            )}
                                                         >
-                                                            <Send className="w-5 h-5" />
+                                                            <Mic className={cn("w-10 h-10", isRecording ? "text-white" : "text-primary-foreground")} />
                                                         </Button>
+                                                        <p className="text-sm font-handwriting text-muted-foreground">
+                                                            {isRecording ? "Listening..." : "Hold to Speak"}
+                                                        </p>
                                                     </div>
                                                 )}
 
-                                                {sessionId && (
-                                                    <Button
-                                                        size="lg"
-                                                        variant="outline"
-                                                        onClick={() => setIsMuted(!isMuted)}
-                                                        className="rounded-full h-12 w-12 shadow-lg"
-                                                    >
-                                                        {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-                                                    </Button>
-                                                )}
+
                                             </div>
 
+                                            {/* Subtitles / Last Message */}
                                             {messages.length > 0 && (
                                                 <motion.div
                                                     initial={{ opacity: 0, y: 10 }}
                                                     animate={{ opacity: 1, y: 0 }}
-                                                    className="w-full"
+                                                    className="w-full text-center mt-4"
                                                 >
-                                                    <div className="bg-amber-100 dark:bg-amber-900/40 rounded-2xl p-4 mb-4 border-2 border-amber-900/30 max-h-40 overflow-y-auto">
-                                                        {messages.slice(-2).map(msg => (
-                                                            <p key={msg.id} className={cn("text-lg font-handwriting", msg.isUser ? "text-right text-muted-foreground" : "text-center")}>
-                                                                {msg.text}
-                                                            </p>
-                                                        ))}
+                                                    <div className="bg-amber-100/50 dark:bg-amber-900/20 rounded-xl p-3 border border-amber-900/10">
+                                                        <p className="text-xl font-handwriting text-foreground/80">
+                                                            {messages[messages.length - 1].isUser ? "..." : messages[messages.length - 1].text}
+                                                        </p>
                                                     </div>
-                                                    <Button
-                                                        onClick={handleGenerateComic}
-                                                        className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full font-handwriting text-xl h-14 shadow-lg"
-                                                    >
-                                                        <Sparkles className="w-5 h-5 mr-2" />
-                                                        View Sketchbook
-                                                    </Button>
                                                 </motion.div>
                                             )}
+
+                                            {comicPanels.length > 0 && (
+                                                <Button
+                                                    onClick={handleGenerateComic}
+                                                    variant="secondary"
+                                                    className="w-full mt-2 rounded-full font-handwriting text-lg shadow-sm"
+                                                >
+                                                    <Sparkles className="w-4 h-4 mr-2" />
+                                                    View Sketchbook ({comicPanels.length})
+                                                </Button>
+                                            )}
+
+
                                         </div>
                                     </div>
                                 </Card>

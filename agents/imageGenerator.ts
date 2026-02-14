@@ -16,7 +16,7 @@ export class ImageGenerator {
         prompt: prompt,
         n: 1,
         size: "1024x1024",
-        quality: "standard",
+        quality: "low",
       });
 
       const url = response.data?.[0]?.url;

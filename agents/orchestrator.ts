@@ -28,7 +28,7 @@ export class ComicOrchestrator {
     this.comicAssembler = new ComicAssembler();
   }
 
-  async handleUserMessage(message: string): Promise<{
+  async handleUserMessage(audioBase64?: string): Promise<{
     response: string;
     audioBase64?: string;
     imageUrl?: string;
@@ -47,11 +47,31 @@ export class ComicOrchestrator {
       };
     }
 
+    let userText = "";
+    if (audioBase64) {
+      try {
+        const audioBuffer = Buffer.from(audioBase64, 'base64');
+        userText = await this.conversationAgent.transcribeAudio(audioBuffer);
+        // Maybe log the transcribed text?
+        console.log("Transcribed text:", userText);
+      } catch (error) {
+        console.error("Transcription failed, falling back to message if available", error);
+        // Fallback to message if transcription fails?
+        // If message is empty, we might have a problem.
+        if (!userText) {
+          return {
+            response: "Sorry, I couldn't hear you. Can you say that again?",
+            isDone: false
+          };
+        }
+      }
+    }
+
     // Step 1: Get conversational response
-    const conversationResult = await this.conversationAgent.chat(message);
+    const conversationResult = await this.conversationAgent.chat(userText);
 
     // Step 2: Extract story elements and build narrative
-    const storyData = await this.storyBuilder.extractAndBuild(message);
+    const storyData = await this.storyBuilder.extractAndBuild(userText);
 
     // Step 3: Generate image for this panel
     // Note: ImageGenerator might need OpenAI key too if it uses DALL-E, but currently it might be using env var or not updated yet.
@@ -62,7 +82,7 @@ export class ComicOrchestrator {
     this.memoryStore.addPanel({
       narration: storyData.narration,
       imageUrl: imageUrl,
-      userInput: message
+      userInput: userText
     });
 
     this.memoryStore.incrementIteration();

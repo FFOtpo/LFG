@@ -4,10 +4,10 @@ import { sessions } from '@/lib/sessionStore';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { sessionId, message } = body;
+        const { sessionId, audioBase64 } = body;
 
-        if (!sessionId || !message) {
-            return NextResponse.json({ error: "sessionId and message are required" }, { status: 400 });
+        if (!sessionId || !audioBase64) {
+            return NextResponse.json({ error: "sessionId and either message or audioBase64 are required" }, { status: 400 });
         }
 
         const orchestrator = sessions.get(sessionId);
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Session not found. Create a new session." }, { status: 404 });
         }
 
-        const result = await orchestrator.handleUserMessage(message);
+        const result = await orchestrator.handleUserMessage(audioBase64);
 
         return NextResponse.json(result);
     } catch (error: any) {

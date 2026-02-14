@@ -38,10 +38,13 @@ app.post('/api/session/new', (req: Request, res: Response) => {
 // Chat endpoint
 app.post('/api/chat', async (req: Request, res: Response) => {
   try {
-    const { sessionId, message } = req.body;
+    const { sessionId, message, audioBase64 } = req.body;
 
-    if (!sessionId || !message) {
-      return res.status(400).json({ error: "sessionId and message are required" });
+    console.log("Received chat request:", { sessionId, hasMessage: !!message, hasAudio: !!audioBase64, audioLength: audioBase64?.length });
+
+    if (!sessionId || (!message && !audioBase64)) {
+      console.log("Validation failed: sessionId or content missing");
+      return res.status(400).json({ error: "sessionId and either message or audioBase64 are required" });
     }
 
     let orchestrator = sessions.get(sessionId);
@@ -49,7 +52,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Session not found. Create a new session." });
     }
 
-    const result = await orchestrator.handleUserMessage(message);
+    const result = await orchestrator.handleUserMessage(message || "", audioBase64);
 
     res.json(result);
   } catch (error: any) {
