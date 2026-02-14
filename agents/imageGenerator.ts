@@ -19,9 +19,12 @@ export class ImageGenerator {
         quality: "low",
       });
 
-      const url = response.data?.[0]?.url;
-      if (!url) throw new Error("No image URL generated");
-      return url;
+      const b64Json = response.data?.[0]?.b64_json;
+      if (!b64Json) {
+        console.error("OpenAI Response missing b64_json:", JSON.stringify(response, null, 2));
+        throw new Error("No image data generated");
+      }
+      return `data:image/png;base64,${b64Json}`;
     } catch (error) {
       console.error("Image generation failed:", error);
       // Return placeholder on error

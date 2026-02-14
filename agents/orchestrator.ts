@@ -20,6 +20,11 @@ export class ComicOrchestrator {
   private maxIterations: number;
 
   constructor(config: OrchestratorConfig) {
+    console.log("Orchestrator config:", {
+      sessionId: config.sessionId,
+      elevenLabsKeyLength: config.elevenLabsApiKey ? config.elevenLabsApiKey.length : 0,
+      openAIKeyLength: config.openAIApiKey ? config.openAIApiKey.length : 0
+    });
     this.maxIterations = config.maxIterations || 5;
     this.memoryStore = new MemoryStore(config.sessionId);
     this.conversationAgent = new ConversationAgent(this.memoryStore, config.elevenLabsApiKey, config.openAIApiKey);

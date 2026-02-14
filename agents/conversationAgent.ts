@@ -3,6 +3,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { MemoryStore } from './memoryStore';
 import { ElevenLabsClient } from "elevenlabs";
 import OpenAI, { toFile } from "openai";
+import { request } from "http";
 
 export class ConversationAgent {
   private llm: ChatOpenAI;
@@ -38,11 +39,13 @@ export class ConversationAgent {
     const textResponse = response.content as string;
 
     try {
-      const audioStream = await this.elevenLabs.generate({
-        voice: "ztqW7U07ITK9TRp5iDUi",
-        text: textResponse,
-        model_id: "eleven_flash_v2_5",
-      });
+      const audioStream = await this.elevenLabs.textToSpeech.convert(
+        "ztqW7U07ITK9TRp5iDUi",
+        {
+          text: textResponse,
+          model_id: "eleven_flash_v2_5",
+        }
+      );
 
       const chunks: Uint8Array[] = [];
       for await (const chunk of audioStream) {

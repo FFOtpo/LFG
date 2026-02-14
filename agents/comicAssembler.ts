@@ -26,7 +26,7 @@ export class ComicAssembler {
     // Save PDF
     const pdfBytes = await pdfDoc.save();
     const outputPath = path.join(process.cwd(), 'output', `comic-${Date.now()}.pdf`);
-    
+
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, pdfBytes);
 
@@ -77,10 +77,10 @@ export class ComicAssembler {
     try {
       const imageBytes = await this.downloadImage(panel.imageUrl);
       const image = await pdfDoc.embedPng(imageBytes);
-      
+
       const imageWidth = 500;
       const imageHeight = 400;
-      
+
       page.drawImage(image, {
         x: 50,
         y: height - 500,
@@ -102,7 +102,7 @@ export class ComicAssembler {
     // Narration
     const narration = this.wrapText(panel.narration, 70);
     let yPosition = height - 550;
-    
+
     narration.forEach(line => {
       page.drawText(line, {
         x: 50,
@@ -116,6 +116,10 @@ export class ComicAssembler {
   }
 
   private async downloadImage(url: string): Promise<Uint8Array> {
+    if (url.startsWith('data:')) {
+      const base64Data = url.split(',')[1];
+      return new Uint8Array(Buffer.from(base64Data, 'base64'));
+    }
     const response = await axios.get(url, { responseType: 'arraybuffer' });
     return new Uint8Array(response.data);
   }
