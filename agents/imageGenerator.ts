@@ -12,7 +12,7 @@ export class ImageGenerator {
   async generate(prompt: string): Promise<string> {
     try {
       const response = await this.openai.images.generate({
-        model: "dall-e-3",
+        model: "gpt-image-1-mini",
         prompt: prompt,
         n: 1,
         size: "1024x1024",
@@ -29,8 +29,4 @@ export class ImageGenerator {
     }
   }
 
-  async generateMultiple(prompts: string[]): Promise<string[]> {
-    const promises = prompts.map(prompt => this.generate(prompt));
-    return Promise.all(promises);
-  }
 }
