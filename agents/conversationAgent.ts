@@ -1,26 +1,20 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { MemoryStore } from './memoryStore';
-import { ElevenLabsClient } from "elevenlabs";
 import OpenAI, { toFile } from "openai";
-import { request } from "http";
 
 export class ConversationAgent {
   private llm: ChatOpenAI;
   private memoryStore: MemoryStore;
-  private elevenLabs: ElevenLabsClient;
   private openai: OpenAI;
 
-  constructor(memoryStore: MemoryStore, elevenLabsApiKey: string, openAIApiKey: string) {
+  constructor(memoryStore: MemoryStore, openAIApiKey: string) {
     this.llm = new ChatOpenAI({
       modelName: "gpt-4o",
       temperature: 0.9,
       openAIApiKey: openAIApiKey
     });
     this.memoryStore = memoryStore;
-    this.elevenLabs = new ElevenLabsClient({
-      apiKey: elevenLabsApiKey,
-    });
     this.openai = new OpenAI({
       apiKey: openAIApiKey,
     });
@@ -39,26 +33,22 @@ export class ConversationAgent {
     const textResponse = response.content as string;
 
     try {
-      const audioStream = await this.elevenLabs.textToSpeech.convert(
-        "ztqW7U07ITK9TRp5iDUi",
-        {
-          text: textResponse,
-          model_id: "eleven_flash_v2_5",
-        }
-      );
+      const speech = await this.openai.audio.speech.create({
+        model: 'gpt-4o-mini-tts',
+        voice: 'nova',
+        input: textResponse,
+        response_format: 'mp3',
+      });
 
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of audioStream) {
-        chunks.push(chunk);
-      }
-      const audioBuffer = Buffer.concat(chunks);
+      console.log("Audio generated via OpenAI TTS");
+      const buffer = Buffer.from(await speech.arrayBuffer());
 
       return {
         text: textResponse,
-        audioBase64: audioBuffer.toString('base64')
+        audioBase64: buffer.toString('base64')
       };
     } catch (error) {
-      console.error("ElevenLabs generation failed:", error);
+      console.error("OpenAI TTS generation failed:", error);
       return {
         text: textResponse,
         audioBase64: ""

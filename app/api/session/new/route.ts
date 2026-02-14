@@ -6,17 +6,15 @@ import { sessions } from '@/lib/sessionStore';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { elevenLabsApiKey, openAIApiKey } = body;
+        const { openAIApiKey } = body;
         const sessionId = uuidv4();
 
         // Use environment variables as fallback if keys are not provided in request
-        const finalElevenLabsKey = elevenLabsApiKey || process.env.ELEVENLABS_API_KEY || "";
-        const finalOpenAIKey = openAIApiKey || process.env.OPENAI_API_KEY || "";
+        const finalOpenAIKey = (openAIApiKey || process.env.OPENAI_API_KEY || "").trim();
 
         const orchestrator = new ComicOrchestrator({
             sessionId,
             maxIterations: 5,
-            elevenLabsApiKey: finalElevenLabsKey,
             openAIApiKey: finalOpenAIKey
         });
         sessions.set(sessionId, orchestrator);

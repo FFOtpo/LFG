@@ -7,7 +7,6 @@ import { MemoryStore } from './memoryStore';
 export interface OrchestratorConfig {
   maxIterations?: number;
   sessionId: string;
-  elevenLabsApiKey: string;
   openAIApiKey: string;
 }
 
@@ -22,12 +21,11 @@ export class ComicOrchestrator {
   constructor(config: OrchestratorConfig) {
     console.log("Orchestrator config:", {
       sessionId: config.sessionId,
-      elevenLabsKeyLength: config.elevenLabsApiKey ? config.elevenLabsApiKey.length : 0,
       openAIKeyLength: config.openAIApiKey ? config.openAIApiKey.length : 0
     });
     this.maxIterations = config.maxIterations || 5;
     this.memoryStore = new MemoryStore(config.sessionId);
-    this.conversationAgent = new ConversationAgent(this.memoryStore, config.elevenLabsApiKey, config.openAIApiKey);
+    this.conversationAgent = new ConversationAgent(this.memoryStore, config.openAIApiKey);
     this.storyBuilder = new StoryBuilder(this.memoryStore, config.openAIApiKey);
     this.imageGenerator = new ImageGenerator(config.openAIApiKey);
     this.comicAssembler = new ComicAssembler();
