@@ -1,4 +1,4 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { MemoryStore } from './memoryStore';
 
@@ -8,13 +8,14 @@ export interface StoryData {
 }
 
 export class StoryBuilder {
-  private llm: ChatAnthropic;
+  private llm: ChatOpenAI;
   private memoryStore: MemoryStore;
 
-  constructor(memoryStore: MemoryStore) {
-    this.llm = new ChatAnthropic({
-      modelName: "claude-sonnet-4-20250514",
+  constructor(memoryStore: MemoryStore, openAIApiKey: string) {
+    this.llm = new ChatOpenAI({
+      modelName: "gpt-4o",
       temperature: 0.7,
+      openAIApiKey: openAIApiKey
     });
     this.memoryStore = memoryStore;
   }
@@ -34,15 +35,18 @@ export class StoryBuilder {
 
     try {
       // Try to parse JSON response
-      const parsed = JSON.parse(content);
+      // Remove any markdown code block syntax if present
+      const jsonString = content.replace(/```json\n?|\n?```/g, '').trim();
+      const parsed = JSON.parse(jsonString);
       return {
         narration: parsed.narration || userMessage,
         imagePrompt: this.formatImagePrompt(parsed.imagePrompt || userMessage)
       };
-    } catch {
-      // Fallback if not JSON
+    } catch (e) {
+      console.error("Failed to parse JSON from StoryBuilder:", e);
+      // Fallback
       return {
-        narration: userMessage,
+        narration: content, // Use full content if not JSON
         imagePrompt: this.formatImagePrompt(userMessage)
       };
     }

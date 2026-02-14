@@ -1,27 +1,26 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { MemoryStore } from './memoryStore';
-import { ElevenLabsClient } from "elevenlabs"; // Import ElevenLabs
+import { ElevenLabsClient } from "elevenlabs";
 
 export class ConversationAgent {
-  private llm: ChatAnthropic;
+  private llm: ChatOpenAI;
   private memoryStore: MemoryStore;
   private elevenLabs: ElevenLabsClient;
 
-  constructor(memoryStore: MemoryStore, apiKey: string) {
-    this.llm = new ChatAnthropic({
-      modelName: "claude-sonnet-4-20250514",
+  constructor(memoryStore: MemoryStore, elevenLabsApiKey: string, openAIApiKey: string) {
+    this.llm = new ChatOpenAI({
+      modelName: "gpt-4o",
       temperature: 0.9,
+      openAIApiKey: openAIApiKey
     });
     this.memoryStore = memoryStore;
-
-    // Initialize ElevenLabs
     this.elevenLabs = new ElevenLabsClient({
-      apiKey: apiKey,
+      apiKey: elevenLabsApiKey,
     });
   }
 
-  async chat(userMessage: string): Promise<{ text: string; audioBuffer: Buffer }> {
+  async chat(userMessage: string): Promise<{ text: string; audioBase64: string }> {
     const iteration = this.memoryStore.getIterationCount();
     const context = this.memoryStore.getStoryContext();
 
@@ -33,29 +32,35 @@ export class ConversationAgent {
     const response = await this.llm.invoke(messages);
     const textResponse = response.content as string;
 
-    // Generate speech from the LLM response
-    const audioStream = await this.elevenLabs.generate({
-      voice: "George", // You can pick a fun "storyteller" voice ID here
-      text: textResponse,
-      model_id: "eleven_multilingual_v2",
-    });
+    try {
+      const audioStream = await this.elevenLabs.generate({
+        voice: "ztqW7U07ITK9TRp5iDUi",
+        text: textResponse,
+        model_id: "eleven_multilingual_v2",
+      });
 
-    // Convert stream to Buffer for easy handling
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of audioStream) {
-      chunks.push(chunk);
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of audioStream) {
+        chunks.push(chunk);
+      }
+      const audioBuffer = Buffer.concat(chunks);
+
+      return {
+        text: textResponse,
+        audioBase64: audioBuffer.toString('base64')
+      };
+    } catch (error) {
+      console.error("ElevenLabs generation failed:", error);
+      return {
+        text: textResponse,
+        audioBase64: ""
+      };
     }
-    const audioBuffer = Buffer.concat(chunks);
-
-    return {
-      text: textResponse,
-      audioBuffer: audioBuffer
-    };
   }
 
   private getSystemPrompt(iteration: number): string {
     return iteration === 0
       ? "Ask the kid about their story idea in a fun, encouraging way. Keep it brief."
-      : "Based on the story context, ask what happens next. Be creative!";
+      : "Based on the previous panel, ask what happens next. Be encouraging and creative. Keep it brief.";
   }
 }

@@ -2,9 +2,11 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { Mic, Volume2, VolumeX, Sparkles, ChevronLeft, ChevronRight, Plus, RotateCcw } from "lucide-react";
+import { Mic, Volume2, VolumeX, Sparkles, ChevronLeft, ChevronRight, Plus, RotateCcw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import axios from "axios";
 
 // Types
 interface Message {
@@ -175,8 +177,12 @@ const ComicPanelCard = ({ panel, index }: { panel: ComicPanel; index: number }) 
             <div className="relative bg-amber-50 dark:bg-amber-950/20 rounded-lg overflow-hidden border-2 border-amber-900/30 shadow-lg">
                 <SketchbookBorder isVisible={isInView} />
                 <div className="relative p-4">
-                    <div className="aspect-video bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 rounded-md flex items-center justify-center">
-                        <Sparkles className="w-12 h-12 text-amber-600" />
+                    <div className="aspect-square bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 rounded-md flex items-center justify-center overflow-hidden">
+                        {panel.imageUrl ? (
+                            <img src={panel.imageUrl} alt={panel.caption} className="w-full h-full object-cover" />
+                        ) : (
+                            <Sparkles className="w-12 h-12 text-amber-600" />
+                        )}
                     </div>
                     <p className="mt-3 text-sm font-handwriting text-center text-foreground/80">
                         {panel.caption}
@@ -190,55 +196,115 @@ const ComicPanelCard = ({ panel, index }: { panel: ComicPanel; index: number }) 
 // Main Component
 const StoryCompanionTool = () => {
     const [isListening, setIsListening] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [showSketchbook, setShowSketchbook] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [comicPanels, setComicPanels] = useState<ComicPanel[]>([]);
     const [currentPanelIndex, setCurrentPanelIndex] = useState(0);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [inputValue, setInputValue] = useState("");
 
-    const handleStartChat = () => {
-        setIsListening(true);
-        // Simulate initial greeting
-        setTimeout(() => {
-            setMessages([
-                {
-                    id: "1",
-                    text: "Hi there! I'm your story companion. Let's create an amazing adventure together!",
-                    isUser: false,
-                    timestamp: new Date(),
-                },
-            ]);
-        }, 500);
+    const handleStartChat = async () => {
+        try {
+            setIsProcessing(true);
+            const response = await axios.post('/api/session/new', {});
+            const { sessionId, message } = response.data;
+            setSessionId(sessionId);
+
+            const newMsg: Message = {
+                id: Date.now().toString(),
+                text: message,
+                isUser: false,
+                timestamp: new Date(),
+            };
+            setMessages([newMsg]);
+            setIsListening(true);
+
+        } catch (error) {
+            console.error("Failed to start session:", error);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleSendMessage = async () => {
+        if (!inputValue.trim() || !sessionId) return;
+
+        const userMsg: Message = {
+            id: Date.now().toString(),
+            text: inputValue,
+            isUser: true,
+            timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, userMsg]);
+        setInputValue("");
+        setIsProcessing(true);
+
+        try {
+            const response = await axios.post('/api/chat', {
+                sessionId,
+                message: userMsg.text
+            });
+
+            const { response: botText, audioBase64, imageUrl } = response.data;
+
+            const botMsg: Message = {
+                id: (Date.now() + 1).toString(),
+                text: botText,
+                isUser: false,
+                timestamp: new Date(),
+            };
+            setMessages(prev => [...prev, botMsg]);
+
+            // Play audio
+            if (audioBase64 && !isMuted) {
+                try {
+                    const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+                    audio.play();
+                    // Simulate speaking animation duration roughly
+                    setIsListening(true); // Character speaks
+                    audio.onended = () => {
+                        // setIsListening(false); // Character stops speaking (optional, or kept generic)
+                    };
+                } catch (e) {
+                    console.error("Audio playback error", e);
+                }
+            }
+
+            // Add to panels
+            if (imageUrl) {
+                const newPanel: ComicPanel = {
+                    id: (Date.now() + 2).toString(),
+                    imageUrl,
+                    caption: botText // Using bot response as caption for now, or could use extraction
+                };
+                setComicPanels(prev => [...prev, newPanel]);
+            }
+
+        } catch (error) {
+            console.error("Chat failed:", error);
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleGenerateComic = () => {
         setShowSketchbook(true);
         setCurrentPanelIndex(0);
-        // Simulate comic generation
-        const newPanels: ComicPanel[] = [
-            { id: "1", imageUrl: "", caption: "Once upon a time..." },
-            { id: "2", imageUrl: "", caption: "A brave hero appeared!" },
-            { id: "3", imageUrl: "", caption: "They went on an adventure!" },
-            { id: "4", imageUrl: "", caption: "And found treasure!" },
-        ];
-        setComicPanels(newPanels);
     };
 
     const handleAddMore = () => {
-        const newPanel: ComicPanel = {
-            id: `${comicPanels.length + 1}`,
-            imageUrl: "",
-            caption: "The adventure continues...",
-        };
-        setComicPanels([...comicPanels, newPanel]);
-        setCurrentPanelIndex(comicPanels.length);
+        // Return to chat
+        setShowSketchbook(false);
     };
 
-    const handleNewStory = () => {
+    const handleNewStory = async () => {
         setShowSketchbook(false);
         setMessages([]);
         setComicPanels([]);
         setCurrentPanelIndex(0);
+        setSessionId(null);
         setIsListening(false);
     };
 
@@ -265,7 +331,7 @@ const StoryCompanionTool = () => {
     }, [showSketchbook, comicPanels.length]);
 
     return (
-        <div className="h-screen w-full overflow-hidden bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-amber-950 dark:via-orange-950 dark:to-yellow-950 landscape:aspect-video">
+        <div className="min-h-screen w-full overflow-x-hidden bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-amber-950 dark:via-orange-950 dark:to-yellow-950">
             {/* Hero Section */}
             <AnimatePresence mode="wait">
                 {!showSketchbook ? (
@@ -274,79 +340,109 @@ const StoryCompanionTool = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="h-full w-full flex items-center justify-center px-8 py-6"
+                        className="min-h-screen w-full flex flex-col items-center justify-center px-6 py-8"
                     >
-                        <div className="flex items-center justify-between gap-8 w-full max-w-6xl">
-                            {/* Left: Title */}
+                        <div className="w-full max-w-md px-4">
+                            {/* Title */}
                             <motion.div
-                                initial={{ x: -30, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
+                                initial={{ y: -20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.2 }}
-                                className="flex-shrink-0"
+                                className="text-center mb-8"
                             >
-                                <h1 className="text-5xl lg:text-7xl font-bold text-foreground mb-2 font-handwriting">
+                                <h1 className="text-5xl font-bold text-foreground mb-2 font-handwriting">
                                     Story Time!
                                 </h1>
-                                <p className="text-xl lg:text-2xl text-muted-foreground font-handwriting">
+                                <p className="text-xl text-muted-foreground font-handwriting">
                                     Create magical stories
                                 </p>
                             </motion.div>
 
-                            {/* Center: Character */}
-                            <div className="flex-shrink-0">
-                                <CartoonCharacter isSpeaking={isListening} />
-                            </div>
-
-                            {/* Right: Controls */}
+                            {/* Main Card Box */}
                             <motion.div
-                                initial={{ x: 30, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                transition={{ delay: 0.4 }}
-                                className="flex flex-col items-center gap-4 flex-shrink-0"
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ delay: 0.3 }}
                             >
-                                <div className="flex gap-3">
-                                    <Button
-                                        size="lg"
-                                        onClick={handleStartChat}
-                                        disabled={isListening}
-                                        className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8 font-handwriting text-xl h-16"
-                                    >
-                                        <Mic className="w-6 h-6 mr-2" />
-                                        {isListening ? "Listening..." : "Start Chat"}
-                                    </Button>
+                                <Card className="relative overflow-hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-4 border-amber-900/20 shadow-2xl rounded-3xl p-8">
+                                    <SketchbookBorder isVisible={true} />
 
-                                    {isListening && (
-                                        <Button
-                                            size="lg"
-                                            variant="outline"
-                                            onClick={() => setIsMuted(!isMuted)}
-                                            className="rounded-full h-16 w-16"
-                                        >
-                                            {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-                                        </Button>
-                                    )}
-                                </div>
+                                    <div className="relative flex flex-col items-center gap-6">
+                                        {/* Character */}
+                                        <CartoonCharacter isSpeaking={isProcessing} />
 
-                                {isListening && messages.length > 0 && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="w-full max-w-sm"
-                                    >
-                                        <div className="bg-amber-100 dark:bg-amber-900/40 rounded-2xl p-4 mb-4 border-2 border-amber-900/30">
-                                            <p className="text-lg font-handwriting text-center">
-                                                {messages[messages.length - 1].text}
-                                            </p>
+                                        {/* Controls */}
+                                        <div className="flex flex-col items-center gap-4 w-full">
+                                            <div className="flex gap-3">
+                                                {!sessionId ? (
+                                                    <Button
+                                                        size="lg"
+                                                        onClick={handleStartChat}
+                                                        disabled={isProcessing}
+                                                        className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8 font-handwriting text-xl h-16 shadow-lg"
+                                                    >
+                                                        <Mic className="w-6 h-6 mr-2" />
+                                                        {isProcessing ? "Starting..." : "Start Chat"}
+                                                    </Button>
+                                                ) : (
+                                                    <div className="flex w-full gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={inputValue}
+                                                            onChange={(e) => setInputValue(e.target.value)}
+                                                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                                            placeholder="Type your story idea..."
+                                                            className="flex-1 rounded-full border-2 border-amber-900/20 bg-white/50 px-4 py-2 focus:outline-none focus:border-primary"
+                                                            disabled={isProcessing}
+                                                        />
+                                                        <Button
+                                                            onClick={handleSendMessage}
+                                                            disabled={!inputValue.trim() || isProcessing}
+                                                            size="icon"
+                                                            className="rounded-full h-12 w-12"
+                                                        >
+                                                            <Send className="w-5 h-5" />
+                                                        </Button>
+                                                    </div>
+                                                )}
+
+                                                {sessionId && (
+                                                    <Button
+                                                        size="lg"
+                                                        variant="outline"
+                                                        onClick={() => setIsMuted(!isMuted)}
+                                                        className="rounded-full h-12 w-12 shadow-lg"
+                                                    >
+                                                        {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                                                    </Button>
+                                                )}
+                                            </div>
+
+                                            {messages.length > 0 && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="w-full"
+                                                >
+                                                    <div className="bg-amber-100 dark:bg-amber-900/40 rounded-2xl p-4 mb-4 border-2 border-amber-900/30 max-h-40 overflow-y-auto">
+                                                        {messages.slice(-2).map(msg => (
+                                                            <p key={msg.id} className={cn("text-lg font-handwriting", msg.isUser ? "text-right text-muted-foreground" : "text-center")}>
+                                                                {msg.text}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                    <Button
+                                                        onClick={handleGenerateComic}
+                                                        className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full font-handwriting text-xl h-14 shadow-lg"
+                                                    >
+                                                        <Sparkles className="w-5 h-5 mr-2" />
+                                                        View Sketchbook
+                                                    </Button>
+                                                </motion.div>
+                                            )}
                                         </div>
-                                        <Button
-                                            onClick={handleGenerateComic}
-                                            className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full font-handwriting text-xl h-14"
-                                        >
-                                            <Sparkles className="w-5 h-5 mr-2" />
-                                            Create My Comic!
-                                        </Button>
-                                    </motion.div>
-                                )}
+                                    </div>
+                                </Card>
                             </motion.div>
                         </div>
                     </motion.section>
@@ -355,29 +451,27 @@ const StoryCompanionTool = () => {
                         key="sketchbook"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="h-full w-full flex items-center justify-center p-8"
+                        className="min-h-screen w-full flex items-center justify-center p-6 py-12"
                     >
-                        <div className="w-full h-full max-w-7xl flex flex-col">
+                        <div className="w-full max-w-md flex flex-col gap-6">
                             {/* Header with Page Counter */}
                             <motion.div
                                 initial={{ y: -20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
-                                className="flex items-center justify-between mb-6"
+                                className="flex items-center justify-between"
                             >
-                                <h2 className="text-4xl font-bold text-foreground font-handwriting">
+                                <h2 className="text-3xl font-bold text-foreground font-handwriting">
                                     Your Story Comic
                                 </h2>
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-amber-100 dark:bg-amber-900/40 px-4 py-2 rounded-full border-2 border-amber-900/30">
-                                        <span className="text-xl font-handwriting">
-                                            {currentPanelIndex + 1} / {comicPanels.length}
-                                        </span>
-                                    </div>
+                                <div className="bg-amber-100 dark:bg-amber-900/40 px-4 py-2 rounded-full border-2 border-amber-900/30">
+                                    <span className="text-lg font-handwriting">
+                                        {currentPanelIndex + 1} / {comicPanels.length}
+                                    </span>
                                 </div>
                             </motion.div>
 
                             {/* Carousel */}
-                            <div className="flex-1 relative">
+                            <div className="relative">
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={currentPanelIndex}
@@ -385,15 +479,19 @@ const StoryCompanionTool = () => {
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -100 }}
                                         transition={{ duration: 0.4 }}
-                                        className="h-full w-full"
+                                        className="w-full"
                                     >
-                                        <div className="relative h-full bg-amber-50 dark:bg-amber-950/20 rounded-3xl border-4 border-amber-900/30 shadow-2xl overflow-hidden">
+                                        <div className="relative w-full bg-amber-50 dark:bg-amber-950/20 rounded-3xl border-4 border-amber-900/30 shadow-2xl overflow-hidden">
                                             <SketchbookBorder isVisible={true} />
-                                            <div className="relative h-full p-8 flex flex-col items-center justify-center">
-                                                <div className="w-full max-w-2xl aspect-video bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 rounded-2xl flex items-center justify-center shadow-lg">
-                                                    <Sparkles className="w-24 h-24 text-amber-600" />
+                                            <div className="relative p-6 flex flex-col items-center justify-center">
+                                                <div className="w-full aspect-video bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                                                    {comicPanels[currentPanelIndex]?.imageUrl ? (
+                                                        <img src={comicPanels[currentPanelIndex]?.imageUrl} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <Sparkles className="w-20 h-20 text-amber-600" />
+                                                    )}
                                                 </div>
-                                                <p className="mt-6 text-3xl font-handwriting text-center text-foreground/90">
+                                                <p className="mt-6 text-2xl font-handwriting text-center text-foreground/90">
                                                     {comicPanels[currentPanelIndex]?.caption}
                                                 </p>
                                             </div>
@@ -405,18 +503,18 @@ const StoryCompanionTool = () => {
                                 <Button
                                     onClick={prevPanel}
                                     disabled={currentPanelIndex === 0}
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full h-14 w-14 bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30"
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full h-12 w-12 bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30"
                                     size="icon"
                                 >
-                                    <ChevronLeft className="w-8 h-8" />
+                                    <ChevronLeft className="w-6 h-6" />
                                 </Button>
                                 <Button
                                     onClick={nextPanel}
                                     disabled={currentPanelIndex === comicPanels.length - 1}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full h-14 w-14 bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-12 w-12 bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30"
                                     size="icon"
                                 >
-                                    <ChevronRight className="w-8 h-8" />
+                                    <ChevronRight className="w-6 h-6" />
                                 </Button>
                             </div>
 
@@ -424,21 +522,21 @@ const StoryCompanionTool = () => {
                             <motion.div
                                 initial={{ y: 20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
-                                className="flex justify-center gap-4 mt-6"
+                                className="flex flex-col gap-3 w-full"
                             >
                                 <Button
                                     onClick={handleAddMore}
                                     size="lg"
-                                    className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full px-8 font-handwriting text-xl h-14"
+                                    className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full font-handwriting text-xl h-14"
                                 >
                                     <Plus className="w-5 h-5 mr-2" />
-                                    Add More
+                                    Continue Story
                                 </Button>
                                 <Button
                                     onClick={handleNewStory}
                                     size="lg"
                                     variant="outline"
-                                    className="rounded-full px-8 font-handwriting text-xl h-14 border-2"
+                                    className="w-full rounded-full font-handwriting text-xl h-14 border-2"
                                 >
                                     <RotateCcw className="w-5 h-5 mr-2" />
                                     New Story

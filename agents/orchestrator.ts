@@ -7,6 +7,8 @@ import { MemoryStore } from './memoryStore';
 export interface OrchestratorConfig {
   maxIterations?: number;
   sessionId: string;
+  elevenLabsApiKey: string;
+  openAIApiKey: string;
 }
 
 export class ComicOrchestrator {
@@ -20,14 +22,15 @@ export class ComicOrchestrator {
   constructor(config: OrchestratorConfig) {
     this.maxIterations = config.maxIterations || 5;
     this.memoryStore = new MemoryStore(config.sessionId);
-    this.conversationAgent = new ConversationAgent(this.memoryStore);
-    this.storyBuilder = new StoryBuilder(this.memoryStore);
-    this.imageGenerator = new ImageGenerator();
+    this.conversationAgent = new ConversationAgent(this.memoryStore, config.elevenLabsApiKey, config.openAIApiKey);
+    this.storyBuilder = new StoryBuilder(this.memoryStore, config.openAIApiKey);
+    this.imageGenerator = new ImageGenerator(config.openAIApiKey);
     this.comicAssembler = new ComicAssembler();
   }
 
   async handleUserMessage(message: string): Promise<{
     response: string;
+    audioBase64?: string;
     imageUrl?: string;
     isDone: boolean;
     finalComic?: string;
@@ -45,12 +48,14 @@ export class ComicOrchestrator {
     }
 
     // Step 1: Get conversational response
-    const conversationResponse = await this.conversationAgent.chat(message);
+    const conversationResult = await this.conversationAgent.chat(message);
 
     // Step 2: Extract story elements and build narrative
     const storyData = await this.storyBuilder.extractAndBuild(message);
 
     // Step 3: Generate image for this panel
+    // Note: ImageGenerator might need OpenAI key too if it uses DALL-E, but currently it might be using env var or not updated yet.
+    // Assuming ImageGenerator uses process.env or has its own config for now.
     const imageUrl = await this.imageGenerator.generate(storyData.imagePrompt);
 
     // Step 4: Save panel
@@ -63,7 +68,8 @@ export class ComicOrchestrator {
     this.memoryStore.incrementIteration();
 
     return {
-      response: conversationResponse,
+      response: conversationResult.text,
+      audioBase64: conversationResult.audioBase64,
       imageUrl: imageUrl,
       isDone: false
     };

@@ -3,9 +3,9 @@ import OpenAI from "openai";
 export class ImageGenerator {
   private openai: OpenAI;
 
-  constructor() {
+  constructor(apiKey?: string) {
     this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: apiKey || process.env.OPENAI_API_KEY,
     });
   }
 
