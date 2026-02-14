@@ -1,6 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { MemoryStore } from '../store/memoryStore';
+import { MemoryStore } from './memoryStore';
 
 export interface StoryData {
   narration: string;
@@ -23,7 +23,7 @@ export class StoryBuilder {
     const context = this.memoryStore.getStoryContext();
 
     const systemPrompt = "Extract story details and create a narration and image prompt. Return JSON: {narration: string, imagePrompt: string}";
-    
+
     const messages = [
       new SystemMessage(systemPrompt),
       new HumanMessage(`Context: ${context}\n\nNew input: ${userMessage}\n\nGenerate narration and kid-friendly comic image prompt.`)
@@ -31,7 +31,7 @@ export class StoryBuilder {
 
     const response = await this.llm.invoke(messages);
     const content = response.content as string;
-    
+
     try {
       // Try to parse JSON response
       const parsed = JSON.parse(content);

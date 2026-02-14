@@ -19,7 +19,9 @@ export class ImageGenerator {
         quality: "standard",
       });
 
-      return response.data[0].url!;
+      const url = response.data?.[0]?.url;
+      if (!url) throw new Error("No image URL generated");
+      return url;
     } catch (error) {
       console.error("Image generation failed:", error);
       // Return placeholder on error

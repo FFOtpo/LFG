@@ -1,8 +1,8 @@
-import { ConversationAgent } from './agents/conversationAgent';
-import { StoryBuilder } from './agents/storyBuilder';
-import { ImageGenerator } from './agents/imageGenerator';
-import { ComicAssembler } from './agents/comicAssembler';
-import { MemoryStore } from './store/memoryStore';
+import { ConversationAgent } from './conversationAgent';
+import { StoryBuilder } from './storyBuilder';
+import { ImageGenerator } from './imageGenerator';
+import { ComicAssembler } from './comicAssembler';
+import { MemoryStore } from './memoryStore';
 
 export interface OrchestratorConfig {
   maxIterations?: number;
@@ -46,13 +46,13 @@ export class ComicOrchestrator {
 
     // Step 1: Get conversational response
     const conversationResponse = await this.conversationAgent.chat(message);
-    
+
     // Step 2: Extract story elements and build narrative
     const storyData = await this.storyBuilder.extractAndBuild(message);
-    
+
     // Step 3: Generate image for this panel
     const imageUrl = await this.imageGenerator.generate(storyData.imagePrompt);
-    
+
     // Step 4: Save panel
     this.memoryStore.addPanel({
       narration: storyData.narration,

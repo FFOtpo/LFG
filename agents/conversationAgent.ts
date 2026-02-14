@@ -1,6 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { MemoryStore } from '../store/memoryStore';
+import { MemoryStore } from './memoryStore';
 
 export class ConversationAgent {
   private llm: ChatAnthropic;
@@ -19,7 +19,7 @@ export class ConversationAgent {
     const context = this.memoryStore.getStoryContext();
 
     const systemPrompt = this.getSystemPrompt(iteration);
-    
+
     const messages = [
       new SystemMessage(systemPrompt),
       new HumanMessage(`Context: ${context}\n\nKid says: ${userMessage}`)
