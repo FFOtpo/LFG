@@ -2,11 +2,12 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { Mic, Volume2, VolumeX, Sparkles, ChevronLeft, ChevronRight, Plus, RotateCcw, Send } from "lucide-react";
+import { Mic, Volume2, VolumeX, Sparkles, ChevronLeft, ChevronRight, Plus, RotateCcw, Send, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import axios from "axios";
+import { jsPDF } from "jspdf";
 
 // Types
 interface Message {
@@ -177,7 +178,7 @@ const ComicPanelCard = ({ panel, index }: { panel: ComicPanel; index: number }) 
             <div className="relative bg-amber-50 dark:bg-amber-950/20 rounded-lg overflow-hidden border-2 border-amber-900/30 shadow-lg">
                 <SketchbookBorder isVisible={isInView} />
                 <div className="relative p-4">
-                    <div className="aspect-square bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 rounded-md flex items-center justify-center overflow-hidden">
+                    <div className="aspect-[4/3] bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 rounded-md flex items-center justify-center overflow-hidden">
                         {panel.imageUrl ? (
                             <img src={panel.imageUrl} alt={panel.caption} className="w-full h-full object-cover" />
                         ) : (
@@ -326,7 +327,20 @@ const StoryCompanionTool = () => {
                             imageUrl,
                             caption: theme || botText
                         };
-                        setComicPanels(prev => [...prev, newPanel]);
+                        setComicPanels(prev => {
+                            const newPanels = [...prev, newPanel];
+                            // If this is the first panel, show the sketchbook
+                            if (newPanels.length === 1) {
+                                setShowSketchbook(true);
+                                setCurrentPanelIndex(0);
+                            }
+                            return newPanels;
+                        });
+
+                        // If we already have panels and just added a new one, move to it
+                        if (comicPanels.length > 0) {
+                            setCurrentPanelIndex(comicPanels.length);
+                        }
                     }
                 } catch (error) {
                     console.error("Chat failed:", error);
@@ -356,6 +370,42 @@ const StoryCompanionTool = () => {
         setCurrentPanelIndex(0);
         setSessionId(null);
         setIsListening(false);
+    };
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+
+        comicPanels.forEach((panel, index) => {
+            if (index > 0) {
+                doc.addPage();
+            }
+
+            // Add Title if first page
+            if (index === 0) {
+                doc.setFontSize(24);
+                doc.text("My StoryTime Comic", 105, 20, { align: "center" });
+            }
+
+            // Add Image
+            if (panel.imageUrl) {
+                // We need to assume images are loaded, or use an async approach with fetch
+                // straightforward way for base64 or simplistic approach:
+                doc.addImage(panel.imageUrl, "JPEG", 15, index === 0 ? 40 : 20, 180, 135); // 4:3 aspect ratio approx
+            }
+
+            // Add Caption
+            doc.setFontSize(14);
+            const splitText = doc.splitTextToSize(panel.caption || "", 170);
+            doc.text(splitText, 105, index === 0 ? 190 : 170, { align: "center" });
+
+            // Watermark
+            doc.setTextColor(200, 200, 200);
+            doc.setFontSize(40);
+            doc.text("StoryTime", 105, 280, { align: "center", angle: 45 });
+            doc.setTextColor(0, 0, 0); // Reset color
+        });
+
+        doc.save("my-story-comic.pdf");
     };
 
     const nextPanel = () => {
@@ -579,7 +629,7 @@ const StoryCompanionTool = () => {
                                         <div className="relative w-full bg-amber-50 dark:bg-amber-950/20 rounded-3xl border-4 border-amber-900/30 shadow-2xl overflow-hidden">
                                             <SketchbookBorder isVisible={true} />
                                             <div className="relative p-6 flex flex-col items-center justify-center">
-                                                <div className="w-full aspect-video bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                                                <div className="w-full aspect-[4/3] bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
                                                     {comicPanels[currentPanelIndex]?.imageUrl ? (
                                                         <img src={comicPanels[currentPanelIndex]?.imageUrl} className="w-full h-full object-cover" />
                                                     ) : (
@@ -619,13 +669,68 @@ const StoryCompanionTool = () => {
                                 animate={{ y: 0, opacity: 1 }}
                                 className="flex flex-col gap-3 w-full"
                             >
+                                <div className="flex flex-col items-center gap-2 mb-4">
+                                    <div className="relative">
+                                        <AnimatePresence>
+                                            {isRecording && (
+                                                <>
+                                                    <motion.div
+                                                        initial={{ scale: 1, opacity: 0.5 }}
+                                                        animate={{ scale: 2, opacity: 0 }}
+                                                        exit={{ scale: 1, opacity: 0 }}
+                                                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+                                                        className="absolute inset-0 bg-red-500 rounded-full z-0"
+                                                    />
+                                                    <motion.div
+                                                        initial={{ scale: 1, opacity: 0.5 }}
+                                                        animate={{ scale: 1.5, opacity: 0 }}
+                                                        exit={{ scale: 1, opacity: 0 }}
+                                                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut", delay: 0.5 }}
+                                                        className="absolute inset-0 bg-red-500 rounded-full z-0"
+                                                    />
+                                                </>
+                                            )}
+                                        </AnimatePresence>
+                                        <Button
+                                            onClick={isRecording ? stopRecording : startRecording}
+                                            disabled={isProcessing}
+                                            className={cn(
+                                                "rounded-full h-20 w-20 shadow-xl transition-all duration-200 relative z-10",
+                                                isRecording ? "bg-red-500 scale-110" : "bg-primary hover:bg-primary/90"
+                                            )}
+                                        >
+                                            {isRecording ? (
+                                                <div className="flex gap-1 h-3 items-end">
+                                                    {[0, 1, 2, 3].map(i => (
+                                                        <motion.div
+                                                            key={i}
+                                                            className="w-1 bg-white rounded-full"
+                                                            animate={{ height: [4, 12, 4] }}
+                                                            transition={{
+                                                                duration: 0.5,
+                                                                repeat: Infinity,
+                                                                delay: i * 0.1,
+                                                                ease: "easeInOut"
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <Mic className="w-8 h-8 text-primary-foreground" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                    <p className="text-sm font-handwriting text-muted-foreground">
+                                        {isRecording ? "Listening..." : "Tell more to continue story"}
+                                    </p>
+                                </div>
                                 <Button
-                                    onClick={handleAddMore}
+                                    onClick={handleExportPDF}
                                     size="lg"
-                                    className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full font-handwriting text-xl h-14"
+                                    className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-full font-handwriting text-xl h-14 shadow-lg mb-2"
                                 >
-                                    <Plus className="w-5 h-5 mr-2" />
-                                    Continue Story
+                                    <Download className="w-5 h-5 mr-2" />
+                                    Export PDF
                                 </Button>
                                 <Button
                                     onClick={handleNewStory}
