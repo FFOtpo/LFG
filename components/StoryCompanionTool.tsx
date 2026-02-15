@@ -287,7 +287,7 @@ const StoryCompanionTool = () => {
                         audioBase64: base64Audio
                     });
 
-                    const { response: botText, audioBase64, imageUrl } = response.data;
+                    const { response: botText, audioBase64, imageUrl, theme } = response.data;
 
                     const botMsg: Message = {
                         id: (Date.now() + 1).toString(),
@@ -316,7 +316,7 @@ const StoryCompanionTool = () => {
                         const newPanel: ComicPanel = {
                             id: (Date.now() + 2).toString(),
                             imageUrl,
-                            caption: botText
+                            caption: theme || botText
                         };
                         setComicPanels(prev => [...prev, newPanel]);
                     }

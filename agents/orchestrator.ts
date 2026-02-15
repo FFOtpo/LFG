@@ -35,6 +35,7 @@ export class ComicOrchestrator {
     response: string;
     audioBase64?: string;
     imageUrl?: string;
+    theme?: string;
     isDone: boolean;
     finalComic?: string;
   }> {
@@ -94,6 +95,7 @@ export class ComicOrchestrator {
       response: conversationResult.text,
       audioBase64: conversationResult.audioBase64,
       imageUrl: imageUrl,
+      theme: storyData.theme,
       isDone: false
     };
   }
