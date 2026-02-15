@@ -28,8 +28,7 @@ export class ImageGenerator {
         config: {
           responseModalities: ['IMAGE'],
           imageConfig: {
-            aspectRatio: '1:1',
-            imageSize: '1024x1024',
+            aspectRatio: '4:3',
           },
         },
       });
