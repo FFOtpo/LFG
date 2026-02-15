@@ -449,21 +449,58 @@ const StoryCompanionTool = () => {
                                                     </Button>
                                                 ) : (
                                                     <div className="flex flex-col items-center gap-2">
-                                                        <Button
-                                                            onMouseDown={startRecording}
-                                                            onMouseUp={stopRecording}
-                                                            onTouchStart={startRecording}
-                                                            onTouchEnd={stopRecording}
-                                                            disabled={isProcessing}
-                                                            className={cn(
-                                                                "rounded-full h-24 w-24 shadow-xl transition-all duration-200",
-                                                                isRecording ? "bg-red-500 scale-110 animate-pulse" : "bg-primary hover:bg-primary/90"
-                                                            )}
-                                                        >
-                                                            <Mic className={cn("w-10 h-10", isRecording ? "text-white" : "text-primary-foreground")} />
-                                                        </Button>
+                                                        <div className="relative">
+                                                            <AnimatePresence>
+                                                                {isRecording && (
+                                                                    <>
+                                                                        <motion.div
+                                                                            initial={{ scale: 1, opacity: 0.5 }}
+                                                                            animate={{ scale: 2, opacity: 0 }}
+                                                                            exit={{ scale: 1, opacity: 0 }}
+                                                                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+                                                                            className="absolute inset-0 bg-red-500 rounded-full z-0"
+                                                                        />
+                                                                        <motion.div
+                                                                            initial={{ scale: 1, opacity: 0.5 }}
+                                                                            animate={{ scale: 1.5, opacity: 0 }}
+                                                                            exit={{ scale: 1, opacity: 0 }}
+                                                                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut", delay: 0.5 }}
+                                                                            className="absolute inset-0 bg-red-500 rounded-full z-0"
+                                                                        />
+                                                                    </>
+                                                                )}
+                                                            </AnimatePresence>
+                                                            <Button
+                                                                onClick={isRecording ? stopRecording : startRecording}
+                                                                disabled={isProcessing}
+                                                                className={cn(
+                                                                    "rounded-full h-24 w-24 shadow-xl transition-all duration-200 relative z-10",
+                                                                    isRecording ? "bg-red-500 scale-110" : "bg-primary hover:bg-primary/90"
+                                                                )}
+                                                            >
+                                                                {isRecording ? (
+                                                                    <div className="flex gap-1 h-3 items-end">
+                                                                        {[0, 1, 2, 3].map(i => (
+                                                                            <motion.div
+                                                                                key={i}
+                                                                                className="w-1 bg-white rounded-full"
+                                                                                animate={{ height: [4, 12, 4] }}
+                                                                                transition={{
+                                                                                    duration: 0.5,
+                                                                                    repeat: Infinity,
+                                                                                    delay: i * 0.1,
+                                                                                    ease: "easeInOut"
+                                                                                }}
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <Mic className="w-10 h-10 text-primary-foreground" />
+                                                                )}
+                                                            </Button>
+                                                        </div>
                                                         <p className="text-sm font-handwriting text-muted-foreground">
-                                                            {isRecording ? "Listening..." : "Hold to Speak"}
+                                                            {isRecording ? "Listening..." : "Tap to Speak"}
                                                         </p>
                                                     </div>
                                                 )}
