@@ -24,8 +24,8 @@ app.post('/api/session/new', (req: Request, res: Response) => {
   const orchestrator = new ComicOrchestrator({
     sessionId,
     maxIterations: 5,
-    elevenLabsApiKey: finalElevenLabsKey,
-    openAIApiKey: finalOpenAIKey
+    openAIApiKey: finalOpenAIKey,
+    googleApiKey: process.env.GOOGLE_API_KEY || ""
   });
   sessions.set(sessionId, orchestrator);
 
@@ -52,7 +52,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Session not found. Create a new session." });
     }
 
-    const result = await orchestrator.handleUserMessage(message || "", audioBase64);
+    const result = await orchestrator.handleUserMessage(audioBase64);
 
     res.json(result);
   } catch (error: any) {

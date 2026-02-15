@@ -10,12 +10,14 @@ export async function POST(request: Request) {
         const sessionId = uuidv4();
 
         // Use environment variables as fallback if keys are not provided in request
-        const finalOpenAIKey = (openAIApiKey || process.env.OPENAI_API_KEY || "").trim();
+        const finalOpenAIKey = openAIApiKey || process.env.OPENAI_API_KEY;
+        const finalGoogleKey = process.env.GOOGLE_API_KEY || "";
 
         const orchestrator = new ComicOrchestrator({
             sessionId,
             maxIterations: 5,
-            openAIApiKey: finalOpenAIKey
+            openAIApiKey: finalOpenAIKey,
+            googleApiKey: finalGoogleKey
         });
         sessions.set(sessionId, orchestrator);
 
