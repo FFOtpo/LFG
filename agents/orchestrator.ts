@@ -8,6 +8,7 @@ export interface OrchestratorConfig {
   maxIterations?: number;
   sessionId: string;
   openAIApiKey: string;
+  googleApiKey: string;
 }
 
 export class ComicOrchestrator {
@@ -21,13 +22,14 @@ export class ComicOrchestrator {
   constructor(config: OrchestratorConfig) {
     console.log("Orchestrator config:", {
       sessionId: config.sessionId,
-      openAIKeyLength: config.openAIApiKey ? config.openAIApiKey.length : 0
+      openAIKeyLength: config.openAIApiKey ? config.openAIApiKey.length : 0,
+      googleKeyLength: config.googleApiKey ? config.googleApiKey.length : 0
     });
     this.maxIterations = config.maxIterations || 5;
     this.memoryStore = new MemoryStore(config.sessionId);
     this.conversationAgent = new ConversationAgent(this.memoryStore, config.openAIApiKey);
     this.storyBuilder = new StoryBuilder(this.memoryStore, config.openAIApiKey);
-    this.imageGenerator = new ImageGenerator(config.openAIApiKey);
+    this.imageGenerator = new ImageGenerator(config.googleApiKey);
     this.comicAssembler = new ComicAssembler();
   }
 

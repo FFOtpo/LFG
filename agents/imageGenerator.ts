@@ -1,31 +1,54 @@
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { IMAGE_PROMPT } from "./prompt/imagePrompt";
 
 export class ImageGenerator {
-  private openai: OpenAI;
+  private ai: GoogleGenAI;
 
   constructor(apiKey?: string) {
-    this.openai = new OpenAI({
-      apiKey: apiKey || process.env.OPENAI_API_KEY,
-    });
+    const key = apiKey || process.env.GOOGLE_API_KEY;
+    if (!key) {
+      console.warn("GOOGLE_API_KEY is not set. Image generation may fail unless provided otherwise.");
+    }
+    this.ai = new GoogleGenAI({ apiKey: key });
   }
 
   async generate(prompt: string): Promise<string> {
     try {
-      const response = await this.openai.images.generate({
-        model: "gpt-image-1-mini",
-        prompt: IMAGE_PROMPT + "\n\n" + prompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "low",
+      const fullPrompt = IMAGE_PROMPT + "\n\n" + prompt;
+
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview',
+        contents: [
+          {
+            parts: [
+              { text: fullPrompt }
+            ]
+          }
+        ],
+        config: {
+          responseModalities: ['IMAGE'],
+          imageConfig: {
+            aspectRatio: '1:1',
+            imageSize: '1024x1024',
+          },
+        },
       });
 
-      const b64Json = response.data?.[0]?.b64_json;
-      if (!b64Json) {
-        console.error("OpenAI Response missing b64_json:", JSON.stringify(response, null, 2));
-        throw new Error("No image data generated");
+      // Extract image from response which is typically in candidates[0].content.parts
+      // The snippet suggests inlineData might be present
+      for (const candidate of response.candidates || []) {
+        for (const part of candidate.content?.parts || []) {
+          if (part.inlineData) {
+            const mimeType = part.inlineData.mimeType || "image/png";
+            const data = part.inlineData.data;
+            return `data:${mimeType};base64,${data}`;
+          }
+        }
       }
-      return `data:image/png;base64,${b64Json}`;
+
+      console.error("No image data found in Google GenAI response");
+      throw new Error("No image data generated");
+
     } catch (error) {
       console.error("Image generation failed:", error);
       // Return placeholder on error
