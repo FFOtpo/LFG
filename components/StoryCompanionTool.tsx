@@ -206,6 +206,7 @@ const StoryCompanionTool = () => {
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const handleStartChat = async () => {
         try {
@@ -282,12 +283,19 @@ const StoryCompanionTool = () => {
                 }
 
                 try {
+                    setErrorMessage(null); // Clear previous errors
                     const response = await axios.post('/api/chat', {
                         sessionId,
                         audioBase64: base64Audio
                     });
 
-                    const { response: botText, audioBase64, imageUrl, theme } = response.data;
+                    const { response: botText, audioBase64, imageUrl, theme, error } = response.data;
+
+                    if (error === "AUDIO_TOO_SHORT") {
+                        setErrorMessage("I couldn't hear you clearly. Can you please repeat that?");
+                        setIsProcessing(false);
+                        return;
+                    }
 
                     const botMsg: Message = {
                         id: (Date.now() + 1).toString(),
@@ -414,7 +422,20 @@ const StoryCompanionTool = () => {
                                         <CartoonCharacter isSpeaking={isListening} />
 
                                         {/* Controls */}
-                                        <div className="flex flex-col items-center gap-4 w-full">
+                                        <div className="flex flex-col items-center gap-4 w-full relative">
+                                            <AnimatePresence>
+                                                {errorMessage && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                        exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                                                        className="absolute -top-20 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-50 text-red-600 px-4 py-2 rounded-full border-2 border-red-200 shadow-lg font-handwriting text-lg z-10"
+                                                    >
+                                                        {errorMessage}
+                                                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-50 border-b-2 border-r-2 border-red-200 rotate-45"></div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                             <div className="flex gap-3 justify-center items-center w-full">
                                                 {!sessionId ? (
                                                     <Button

@@ -1,5 +1,6 @@
 export const STORY_BUILDER_SYSTEM_PROMPT = `
 Extract story details and create a narration and image prompt. Return JSON: {narration: string, imagePrompt: string, theme: string}
+Give the narration, only in the english language.
 Theme should be in very crisp, ensure that the theme truely represents the scene
 `
 

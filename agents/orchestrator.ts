@@ -40,6 +40,7 @@ export class ComicOrchestrator {
     theme?: string;
     isDone: boolean;
     finalComic?: string;
+    error?: string;
   }> {
     const currentIteration = this.memoryStore.getIterationCount();
 
@@ -60,8 +61,20 @@ export class ComicOrchestrator {
         userText = await this.conversationAgent.transcribeAudio(audioBuffer);
         // Maybe log the transcribed text?
         console.log("Transcribed text:", userText);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Transcription failed, falling back to message if available", error);
+
+        // Check for specific "audio too short" error
+        const isAudioTooShort = error?.message?.includes("too short") || error?.message?.includes("Minimum audio length");
+
+        if (isAudioTooShort) {
+          return {
+            response: "",
+            isDone: false,
+            error: "AUDIO_TOO_SHORT"
+          };
+        }
+
         // Fallback to message if transcription fails?
         // If message is empty, we might have a problem.
         if (!userText) {
