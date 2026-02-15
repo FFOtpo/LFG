@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { IMAGE_PROMPT } from "./prompt/imagePrompt";
 
 export class ImageGenerator {
   private openai: OpenAI;
@@ -13,7 +14,7 @@ export class ImageGenerator {
     try {
       const response = await this.openai.images.generate({
         model: "gpt-image-1-mini",
-        prompt: prompt,
+        prompt: IMAGE_PROMPT + "\n\n" + prompt,
         n: 1,
         size: "1024x1024",
         quality: "low",

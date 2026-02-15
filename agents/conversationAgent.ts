@@ -2,6 +2,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { MemoryStore } from './memoryStore';
 import OpenAI, { toFile } from "openai";
+import { CONVERSATION_AGENT_SYSTEM_PROMPT, CONVERSATION_AGENT_USER_PROMPT } from "./prompt/conversationAgent";
 
 export class ConversationAgent {
   private llm: ChatOpenAI;
@@ -25,8 +26,8 @@ export class ConversationAgent {
     const context = this.memoryStore.getStoryContext();
 
     const messages = [
-      new SystemMessage(this.getSystemPrompt(iteration)),
-      new HumanMessage(`Context: ${context}\n\nKid says: ${userMessage}`)
+      new SystemMessage(CONVERSATION_AGENT_SYSTEM_PROMPT),
+      new HumanMessage(CONVERSATION_AGENT_USER_PROMPT.replace("{context}", context).replace("{userMessage}", userMessage))
     ];
 
     const response = await this.llm.invoke(messages);
@@ -70,9 +71,4 @@ export class ConversationAgent {
     }
   }
 
-  private getSystemPrompt(iteration: number): string {
-    return iteration === 0
-      ? "Ask the kid about their story idea in a fun, encouraging way. Keep it brief."
-      : "Based on the previous panel, ask what happens next. Be encouraging and creative. Keep it brief.";
-  }
 }

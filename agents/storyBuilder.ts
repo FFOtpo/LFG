@@ -1,10 +1,12 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { MemoryStore } from './memoryStore';
+import { STORY_BUILDER_SYSTEM_PROMPT, STORY_BUILDER_USER_PROMPT } from "./prompt/story_builder";
 
 export interface StoryData {
   narration: string;
   imagePrompt: string;
+  theme: string;
 }
 
 export class StoryBuilder {
@@ -23,11 +25,10 @@ export class StoryBuilder {
   async extractAndBuild(userMessage: string): Promise<StoryData> {
     const context = this.memoryStore.getStoryContext();
 
-    const systemPrompt = "Extract story details and create a narration and image prompt. Return JSON: {narration: string, imagePrompt: string}";
 
     const messages = [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(`Context: ${context}\n\nNew input: ${userMessage}\n\nGenerate narration and kid-friendly comic image prompt.`)
+      new SystemMessage(STORY_BUILDER_SYSTEM_PROMPT),
+      new HumanMessage(STORY_BUILDER_USER_PROMPT.replace("{context}", context).replace("{userMessage}", userMessage))
     ];
 
     const response = await this.llm.invoke(messages);
@@ -40,14 +41,16 @@ export class StoryBuilder {
       const parsed = JSON.parse(jsonString);
       return {
         narration: parsed.narration || userMessage,
-        imagePrompt: this.formatImagePrompt(parsed.imagePrompt || userMessage)
+        imagePrompt: this.formatImagePrompt(parsed.imagePrompt || userMessage),
+        theme: parsed.theme || ""
       };
     } catch (e) {
       console.error("Failed to parse JSON from StoryBuilder:", e);
       // Fallback
       return {
         narration: content, // Use full content if not JSON
-        imagePrompt: this.formatImagePrompt(userMessage)
+        imagePrompt: this.formatImagePrompt(userMessage),
+        theme: ""
       };
     }
   }
